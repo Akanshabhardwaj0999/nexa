@@ -20,7 +20,11 @@ export function getClientId() {
     let clientId = sessionStorage.getItem(CLIENT_ID_KEY);
 
     if (!clientId) {
-        clientId = crypto.randomUUID();
+        // randomUUID is missing on older mobile browsers and non-HTTPS pages
+        clientId =
+            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                ? crypto.randomUUID()
+                : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
         sessionStorage.setItem(CLIENT_ID_KEY, clientId);
     }
 

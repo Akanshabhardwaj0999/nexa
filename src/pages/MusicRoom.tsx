@@ -445,14 +445,27 @@ function MusicRoom() {
 
         const session = navigator.mediaSession;
 
-        session.setActionHandler("play", () => mediaActions.current.togglePlay());
-        session.setActionHandler("pause", () => mediaActions.current.togglePlay());
-        session.setActionHandler("nexttrack", () => mediaActions.current.skip(1));
-        session.setActionHandler("previoustrack", () => mediaActions.current.skip(-1));
+        // Some mobile browsers throw for unsupported actions, which would
+        // otherwise crash the whole page into a blank screen.
+        const setHandler = (
+            action: MediaSessionAction,
+            handler: MediaSessionActionHandler | null,
+        ) => {
+            try {
+                session.setActionHandler(action, handler);
+            } catch {
+                // action not supported on this browser
+            }
+        };
+
+        setHandler("play", () => mediaActions.current.togglePlay());
+        setHandler("pause", () => mediaActions.current.togglePlay());
+        setHandler("nexttrack", () => mediaActions.current.skip(1));
+        setHandler("previoustrack", () => mediaActions.current.skip(-1));
 
         return () => {
             (["play", "pause", "nexttrack", "previoustrack"] as const).forEach(
-                (action) => session.setActionHandler(action, null),
+                (action) => setHandler(action, null),
             );
         };
     }, []);
@@ -462,7 +475,7 @@ function MusicRoom() {
             ? `${currentSong.title} · ${currentSong.artist} | Nexa`
             : `Room ${code} | Nexa`;
 
-        if ("mediaSession" in navigator && currentSong) {
+        if ("mediaSession" in navigator && typeof MediaMetadata !== "undefined" && currentSong) {
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: currentSong.title,
                 artist: currentSong.artist,
