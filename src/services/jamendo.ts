@@ -4,6 +4,8 @@ const JAMENDO_BASE_URL = "https://api.jamendo.com/v3.0";
 
 const CLIENT_ID = import.meta.env.VITE_JAMENDO_CLIENT_ID || "";
 
+const PAGE_SIZE = 40;
+
 export interface JamendoTrack {
   id: string;
   name: string;
@@ -59,7 +61,7 @@ async function fetchTracks(
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     format: "json",
-    limit: "20",
+    limit: String(PAGE_SIZE),
     audioformat: "mp32",
     ...extraParams,
   });
@@ -87,8 +89,11 @@ async function fetchTracks(
   return data.results.map(mapJamendoTrackToSong);
 }
 
-export function searchTracks(query: string) {
-  return fetchTracks({ search: query });
+export function searchTracks(query: string, page = 0) {
+  return fetchTracks({
+    search: query,
+    offset: String(page * PAGE_SIZE),
+  });
 }
 
 export function getPopularTracks() {

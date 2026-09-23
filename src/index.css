@@ -87,3 +87,33 @@ body {
   border-radius: 9999px;
   background: #fff;
 }
+
+/* Home hero animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes drift-left {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-6px) rotate(-3deg); }
+}
+
+@keyframes drift-right {
+  0%, 100% { transform: translateY(0) rotate(4deg); }
+  50% { transform: translateY(-6px) rotate(3deg); }
+}
+
+@keyframes wave-flow {
+  to { stroke-dashoffset: -34; }
+}
+
+@keyframes route {
+  to { stroke-dashoffset: -22; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+  }
+}

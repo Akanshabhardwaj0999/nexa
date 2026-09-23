@@ -24,6 +24,8 @@ interface AudiusResponse {
 
 export const AUDIUS_ID_PREFIX = "audius:";
 
+const PAGE_SIZE = 40;
+
 function getStreamUrl(trackId: string) {
   // This endpoint redirects to a freshly signed stream URL,
   // so it is safe to store in the database.
@@ -50,7 +52,7 @@ async function fetchTracks(
 ): Promise<Song[]> {
   const params = new URLSearchParams({
     app_name: APP_NAME,
-    limit: "20",
+    limit: String(PAGE_SIZE),
     ...extraParams,
   });
 
@@ -66,12 +68,14 @@ async function fetchTracks(
 
   return data.data
     .filter((track) => track.is_streamable !== false)
-    .slice(0, 20)
     .map(mapAudiusTrackToSong);
 }
 
-export function searchTracks(query: string) {
-  return fetchTracks("/tracks/search", { query });
+export function searchTracks(query: string, page = 0) {
+  return fetchTracks("/tracks/search", {
+    query,
+    offset: String(page * PAGE_SIZE),
+  });
 }
 
 export function getTrendingTracks() {
