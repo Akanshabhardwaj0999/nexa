@@ -150,9 +150,9 @@ function Home() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium">
+                  {/* <p className="text-sm font-medium">
                     Akansha is listening
-                  </p>
+                  </p> */}
 
                   <p className="text-xs text-white/40">
                     In sync · 00:42
