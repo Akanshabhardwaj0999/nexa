@@ -83,3 +83,37 @@ begin
         end if;
     end loop;
 end $$;
+
+-- Rooms are for two people. Refuse a third name joining a room
+-- (names are matched ignoring case, like the app does).
+create or replace function public.nexa_limit_room_members()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    -- Lock the room so two people joining at once are checked in turn.
+    perform 1 from public.rooms where id = new.room_id for update;
+
+    if not exists (
+        select 1 from public.room_members
+        where room_id = new.room_id
+          and lower(trim(user_name)) = lower(trim(new.user_name))
+    ) and (
+        select count(distinct lower(trim(user_name)))
+        from public.room_members
+        where room_id = new.room_id
+    ) >= 2 then
+        raise exception 'room_full' using errcode = 'P0001';
+    end if;
+
+    return new;
+end;
+$$;
+
+drop trigger if exists nexa_limit_room_members on public.room_members;
+
+create trigger nexa_limit_room_members
+    before insert on public.room_members
+    for each row execute function public.nexa_limit_room_members();

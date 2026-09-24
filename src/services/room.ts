@@ -206,6 +206,15 @@ export async function getRoomByCode(roomCode: string) {
 // Join room
 // --------------------------------------------------
 
+// Rooms are for couples: the first two names to join own the room.
+export const MAX_ROOM_MEMBERS = 2;
+
+export class RoomFullError extends Error {
+    constructor() {
+        super("Room is full");
+    }
+}
+
 export async function joinRoom(
     roomCode: string,
     userName: string,
@@ -227,20 +236,27 @@ export async function joinRoom(
         throw new Error("Room not found");
     }
 
-    // Check if this name is already in the room
-    const { data: existingMember, error: memberCheckError } =
-        await supabase
-            .from("room_members")
-            .select("id")
-            .eq("room_id", room.id)
-            .eq("user_name", name)
-            .maybeSingle();
+    const { data: members, error: memberCheckError } = await supabase
+        .from("room_members")
+        .select("user_name")
+        .eq("room_id", room.id);
 
     if (memberCheckError) {
         throw memberCheckError;
     }
 
-    if (!existingMember) {
+    // "Rahul" and "rahul" are the same person coming back.
+    const names = new Set(
+        (members as { user_name: string }[]).map((member) =>
+            member.user_name.trim().toLowerCase(),
+        ),
+    );
+
+    if (!names.has(name.toLowerCase())) {
+        if (names.size >= MAX_ROOM_MEMBERS) {
+            throw new RoomFullError();
+        }
+
         const { error: memberError } = await supabase
             .from("room_members")
             .insert({
@@ -249,6 +265,11 @@ export async function joinRoom(
             });
 
         if (memberError) {
+            // The database refuses too, for two people joining at once.
+            if (memberError.message.includes("room_full")) {
+                throw new RoomFullError();
+            }
+
             throw memberError;
         }
     }
