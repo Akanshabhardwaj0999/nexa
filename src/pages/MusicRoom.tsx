@@ -4,8 +4,10 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import LibraryPanel from "../components/room/LibraryPanel";
 import NamePrompt from "../components/room/NamePrompt";
+import MiniPlayer from "../components/room/MiniPlayer";
 import NowPlaying from "../components/room/NowPlaying";
 import RoomHeader from "../components/room/RoomHeader";
+import PageBackground from "../components/ui/PageBackground";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useRoomChannel } from "../hooks/useRoomChannel";
 import {
@@ -491,6 +493,27 @@ function MusicRoom() {
         };
     }, [currentSong, code]);
 
+    // Show the mini player on small screens once the big one scrolls away.
+    const nowPlayingRef = useRef<HTMLDivElement | null>(null);
+    const [isNowPlayingVisible, setIsNowPlayingVisible] = useState(true);
+
+    useEffect(() => {
+        const element = nowPlayingRef.current;
+
+        if (!element || typeof IntersectionObserver === "undefined") {
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            ([entry]) => setIsNowPlayingVisible(entry.isIntersecting),
+            { rootMargin: "-40% 0px 0px 0px" },
+        );
+
+        observer.observe(element);
+
+        return () => observer.disconnect();
+    }, [status]);
+
     // --------------------------------------------------
     // Render
     // --------------------------------------------------
@@ -509,11 +532,13 @@ function MusicRoom() {
 
     if (status === "loading") {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-[#08080c] text-white">
-                <div className="text-center">
-                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-white" />
+            <main className="relative flex min-h-dvh items-center justify-center bg-[#06050c] text-white">
+                <PageBackground />
 
-                    <p className="mt-4 text-sm text-white/40">
+                <div className="relative text-center">
+                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-violet-300" />
+
+                    <p className="mt-4 text-sm text-white/50">
                         Entering your room...
                     </p>
                 </div>
@@ -523,35 +548,37 @@ function MusicRoom() {
 
     if (status === "not-found" || status === "error") {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-[#08080c] px-5 text-white">
-                <div className="max-w-sm text-center">
+            <main className="relative flex min-h-dvh items-center justify-center bg-[#06050c] px-5 text-white">
+                <PageBackground />
+
+                <div className="relative max-w-sm text-center">
                     <h1 className="text-3xl font-semibold tracking-tight">
                         {status === "not-found"
                             ? "Room not found"
                             : "Something went wrong"}
                     </h1>
 
-                    <p className="mt-3 text-sm leading-6 text-white/40">
+                    <p className="mt-3 text-sm leading-6 text-white/50">
                         {status === "not-found"
                             ? `There's no room with the code ${code}. Check the code and try again.`
                             : "We couldn't load this room. Check your connection and try again."}
                     </p>
 
-                    <div className="mt-8 flex justify-center gap-3">
+                    <div className="mt-8 flex flex-wrap justify-center gap-3">
                         <button
                             onClick={() =>
                                 status === "error"
                                     ? window.location.reload()
                                     : navigate("/join")
                             }
-                            className="rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition hover:scale-[1.02]"
+                            className="min-h-12 rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition hover:scale-[1.02]"
                         >
                             {status === "error" ? "Try again" : "Enter a code"}
                         </button>
 
                         <button
                             onClick={() => navigate("/")}
-                            className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm text-white/70 transition hover:bg-white/10"
+                            className="min-h-12 rounded-full border border-violet-400/50 px-6 py-3 text-sm text-white/80 transition hover:bg-violet-500/10"
                         >
                             Home
                         </button>
@@ -571,14 +598,11 @@ function MusicRoom() {
             ? `Listening together with ${partner.userName}`
             : "Share the room code to invite a friend");
 
-    return (
-        <main className="min-h-screen bg-[#08080c] text-white">
-            {/* Ambient background */}
-            <div className="pointer-events-none fixed inset-0 overflow-hidden">
-                <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-[140px]" />
+    const miniDuration = player.duration || currentSong?.duration || 0;
 
-                <div className="absolute -right-40 top-40 h-[500px] w-[500px] rounded-full bg-cyan-400/10 blur-[160px]" />
-            </div>
+    return (
+        <main className="relative min-h-dvh overflow-x-hidden bg-[#06050c] text-white">
+            <PageBackground />
 
             <RoomHeader
                 roomCode={code}
@@ -588,11 +612,12 @@ function MusicRoom() {
                 onHome={() => navigate("/")}
             />
 
-            <div className="relative z-10 mx-auto grid max-w-7xl gap-8 px-4 py-6 sm:px-5 lg:grid-cols-[1fr_400px] lg:px-8 lg:py-8">
-                <div>
+            {/* Bottom padding leaves room for the mini player on phones. */}
+            <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-28 pt-4 sm:gap-8 sm:px-6 sm:pt-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:px-8 lg:pb-10 lg:pt-8 xl:grid-cols-[minmax(0,1fr)_440px]">
+                <div ref={nowPlayingRef} className="min-w-0">
                     <button
                         onClick={() => navigate("/")}
-                        className="mb-6 flex w-fit items-center gap-2 text-sm text-white/30 transition hover:text-white"
+                        className="mb-4 hidden w-fit items-center gap-2 text-sm text-white/40 transition hover:text-white sm:mb-6 sm:flex"
                     >
                         <ChevronLeft size={16} />
                         Leave room
@@ -626,6 +651,20 @@ function MusicRoom() {
                     onRemove={removeFromPlaylist}
                 />
             </div>
+
+            {currentSong && (
+                <MiniPlayer
+                    song={currentSong}
+                    visible={!isNowPlayingVisible}
+                    isPlaying={player.isPlaying}
+                    isBuffering={player.isBuffering}
+                    progress={miniDuration > 0 ? (player.currentTime / miniDuration) * 100 : 0}
+                    canSkip={playlist.length > 0}
+                    onTogglePlay={player.isBlocked ? unlockAudio : togglePlay}
+                    onNext={() => skip(1)}
+                    onOpen={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                />
+            )}
         </main>
     );
 }

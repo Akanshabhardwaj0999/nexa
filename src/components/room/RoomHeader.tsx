@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { getInviteLink } from "../../services/room";
 import type { RoomMember } from "../../types/music";
+import Brand from "../ui/Brand";
 
 const AVATAR_COLORS = ["bg-fuchsia-400", "bg-cyan-400", "bg-violet-400", "bg-amber-300"];
 
@@ -47,25 +48,14 @@ function RoomHeader({
     const partner = members.find((member) => member.clientId !== clientId);
 
     return (
-        <header className="relative z-20 flex h-20 items-center justify-between gap-3 border-b border-white/5 px-5 sm:px-8">
-            <button
-                onClick={onHome}
-                className="flex shrink-0 items-center gap-3"
-            >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black">
-                    <span className="text-sm font-bold">N</span>
-                </div>
-
-                <span className="hidden text-lg font-semibold tracking-tight sm:block">
-                    Nexa
-                </span>
-            </button>
+        <header className="relative z-20 mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:h-20 sm:gap-3 sm:px-6 lg:px-8">
+            <Brand onClick={onHome} compact />
 
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <button
                     onClick={() => copy("code")}
                     title="Copy room code"
-                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/60 transition hover:bg-white/10 sm:px-4"
+                    className="flex h-10 items-center gap-2 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 text-sm text-white/80 transition hover:bg-violet-500/20 sm:px-4"
                 >
                     <span className="font-medium tracking-[0.15em]">
                         {roomCode}
@@ -79,7 +69,7 @@ function RoomHeader({
                 </button>
 
                 <div
-                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-1.5 pr-3"
+                    className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/5 pl-1.5 pr-3"
                     title={members.map((member) => member.userName).join(", ")}
                 >
                     <div className="flex -space-x-2">
@@ -119,7 +109,7 @@ function RoomHeader({
                 <button
                     onClick={() => copy("link")}
                     title="Copy invite link"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 transition hover:bg-white/10 hover:text-white"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition hover:bg-white/10 hover:text-white"
                 >
                     {copied === "link" ? (
                         <Check size={16} className="text-emerald-300" />

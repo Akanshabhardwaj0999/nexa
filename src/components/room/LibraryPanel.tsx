@@ -152,7 +152,7 @@ function LibraryPanel({
         MUSIC_CATEGORIES.find((item) => item.id === category)?.label ?? "";
 
     return (
-        <aside className="flex min-h-0 flex-col rounded-[28px] border border-white/10 bg-white/[0.035] p-4 backdrop-blur-xl sm:p-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-128px)]">
+        <aside className="flex min-h-0 min-w-0 flex-col rounded-[28px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl sm:p-5 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-48px)]">
             <div className="flex items-center justify-between px-1">
                 <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-white/30">
@@ -173,7 +173,7 @@ function LibraryPanel({
                     e.preventDefault();
                     handleSearch();
                 }}
-                className="mt-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 focus-within:border-white/25"
+                className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 focus-within:border-violet-400/60 sm:mt-5"
             >
                 {isSearching ? (
                     <Loader2 size={17} className="shrink-0 animate-spin text-white/40" />
@@ -184,16 +184,16 @@ function LibraryPanel({
                 <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search songs or singers, e.g. Karan Aujla"
+                    placeholder="Search songs or singers..."
                     enterKeyHint="search"
-                    className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/25"
+                    className="w-full min-w-0 bg-transparent text-base text-white outline-none placeholder:text-white/30 sm:text-sm"
                 />
 
                 {query && (
                     <button
                         type="button"
                         onClick={clearSearch}
-                        className="shrink-0 text-white/30 transition hover:text-white"
+                        className="-mr-2 flex h-8 w-8 shrink-0 items-center justify-center text-white/40 transition hover:text-white"
                         aria-label="Clear search"
                     >
                         <X size={16} />
@@ -210,7 +210,7 @@ function LibraryPanel({
                         <button
                             key={item.id}
                             onClick={() => pickCategory(item.id)}
-                            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition ${
+                            className={`shrink-0 rounded-full border px-4 py-2 text-xs transition sm:px-3.5 sm:py-1.5 ${
                                 selected
                                     ? "border-violet-400/60 bg-violet-500/20 text-white"
                                     : "border-white/10 bg-white/[0.03] text-white/50 hover:text-white/80"
@@ -228,7 +228,7 @@ function LibraryPanel({
                     <button
                         key={key}
                         onClick={() => setTab(key)}
-                        className={`rounded-xl py-2 capitalize transition ${
+                        className={`rounded-xl py-2.5 capitalize transition sm:py-2 ${
                             tab === key
                                 ? "bg-white/10 text-white"
                                 : "text-white/40 hover:text-white/70"

@@ -49,7 +49,7 @@ function SongRow({
 
                 <div
                     className={`absolute inset-0 flex items-center justify-center bg-black/40 transition ${
-                        active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        active ? "opacity-100" : "opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                     }`}
                 >
                     {active && isPlaying ? (
@@ -76,7 +76,7 @@ function SongRow({
                     {song.title}
                 </p>
 
-                <p className="mt-0.5 truncate text-xs text-white/30">
+                <p className="mt-0.5 truncate text-xs text-white/40">
                     {song.artist}
                 </p>
             </button>
@@ -90,7 +90,7 @@ function SongRow({
                     onClick={onAdd}
                     disabled={added}
                     title={added ? "In queue" : "Add to queue"}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition hover:bg-white hover:text-black disabled:cursor-default disabled:opacity-40 disabled:hover:bg-white/5 disabled:hover:text-white/60"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:bg-white hover:text-black disabled:cursor-default disabled:opacity-40 disabled:hover:bg-white/5 disabled:hover:text-white/60"
                 >
                     {added ? <Check size={14} /> : <Plus size={15} />}
                 </button>
@@ -100,7 +100,7 @@ function SongRow({
                 <button
                     onClick={onRemove}
                     title="Remove from queue"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/25 transition hover:bg-white/10 hover:text-white sm:opacity-0 sm:group-hover:opacity-100"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/35 transition hover:bg-white/10 hover:text-white [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
                 >
                     <X size={15} />
                 </button>

@@ -74,8 +74,8 @@ function NowPlaying({
     return (
         <section className="flex flex-col">
             {/* Album */}
-            <div className="mx-auto w-full max-w-[460px]">
-                <div className="group relative aspect-square overflow-hidden rounded-[36px] border border-white/10 bg-white/5 shadow-2xl">
+            <div className="mx-auto w-full max-w-[min(460px,46dvh)] sm:max-w-[min(460px,52dvh)] lg:max-w-[460px]">
+                <div className="group relative aspect-square overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-[0_20px_80px_rgba(0,0,0,0.45)] sm:rounded-[36px]">
                     {song ? (
                         <img
                             src={song.cover || FALLBACK_COVER}
@@ -91,14 +91,14 @@ function NowPlaying({
                             }`}
                         />
                     ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-500/30 via-violet-500/20 to-cyan-400/30">
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-500/30 via-violet-500/25 to-sky-400/30">
                             <Headphones size={64} className="text-white/30" />
                         </div>
                     )}
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/10" />
 
-                    <div className="absolute bottom-6 left-6 right-6 sm:bottom-7 sm:left-7 sm:right-7">
+                    <div className="absolute bottom-5 left-5 right-5 sm:bottom-7 sm:left-7 sm:right-7">
                         <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-white/50">
                             {isPlaying && (
                                 <span className="flex h-3 items-end gap-0.5">
@@ -110,11 +110,11 @@ function NowPlaying({
                             {song ? "Now playing" : "Nothing playing"}
                         </p>
 
-                        <h1 className="line-clamp-2 text-2xl font-semibold tracking-tight sm:text-4xl">
+                        <h1 className="line-clamp-2 text-xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
                             {song?.title ?? "Pick a song"}
                         </h1>
 
-                        <p className="mt-1 truncate text-white/50">
+                        <p className="mt-1 truncate text-sm text-white/60 sm:text-base">
                             {song?.artist ?? "Search or discover music to play together"}
                         </p>
                     </div>
@@ -137,8 +137,8 @@ function NowPlaying({
             </div>
 
             {/* Info */}
-            <div className="mx-auto mt-6 flex w-full max-w-[460px] items-center justify-between">
-                <p className="min-h-5 truncate text-sm text-white/40">
+            <div className="mx-auto mt-5 flex w-full max-w-[460px] items-center justify-between sm:mt-6">
+                <p className="min-h-5 truncate text-sm text-white/50">
                     {activity}
                 </p>
 
@@ -163,7 +163,7 @@ function NowPlaying({
             </div>
 
             {/* Progress */}
-            <div className="mx-auto mt-5 w-full max-w-[460px]">
+            <div className="mx-auto mt-4 w-full max-w-[460px] sm:mt-5">
                 <input
                     type="range"
                     min={0}
@@ -187,12 +187,12 @@ function NowPlaying({
             </div>
 
             {/* Controls */}
-            <div className="mx-auto mt-4 flex w-full max-w-[460px] items-center justify-center gap-8">
+            <div className="mx-auto mt-3 flex w-full max-w-[460px] items-center justify-center gap-6 sm:mt-4 sm:gap-8">
                 <button
                     onClick={onPrevious}
                     disabled={!canSkip}
                     aria-label="Previous"
-                    className="text-white/50 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-white/60 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
                 >
                     <SkipBack size={22} />
                 </button>
@@ -201,7 +201,7 @@ function NowPlaying({
                     onClick={isBlocked ? onUnlock : onTogglePlay}
                     disabled={!song}
                     aria-label={isPlaying ? "Pause" : "Play"}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-xl transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
+                    className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.2)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
                 >
                     {isBuffering && isPlaying ? (
                         <Loader2 size={22} className="animate-spin" />
@@ -216,18 +216,18 @@ function NowPlaying({
                     onClick={onNext}
                     disabled={!canSkip}
                     aria-label="Next"
-                    className="text-white/50 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-white/60 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-20"
                 >
                     <SkipForward size={22} />
                 </button>
             </div>
 
             {/* Volume (local only, each listener picks their own) */}
-            <div className="mx-auto mt-6 flex items-center gap-3 text-white/40">
+            <div className="mx-auto mt-5 flex items-center gap-3 text-white/40 sm:mt-6">
                 <button
                     onClick={() => onVolume(volume === 0 ? 0.8 : 0)}
                     aria-label="Mute"
-                    className="transition hover:text-white"
+                    className="flex h-10 w-10 items-center justify-center transition hover:text-white"
                 >
                     <VolumeIcon size={17} />
                 </button>
@@ -240,7 +240,7 @@ function NowPlaying({
                     value={volume}
                     onChange={(e) => onVolume(Number(e.target.value))}
                     style={{ "--progress": `${volume * 100}%` } as CSSProperties}
-                    className="range-slider w-28"
+                    className="range-slider w-32 sm:w-28"
                     aria-label="Volume"
                 />
             </div>

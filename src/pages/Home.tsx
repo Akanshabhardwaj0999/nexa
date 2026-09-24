@@ -14,6 +14,9 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import Brand from "../components/ui/Brand";
+import PageBackground from "../components/ui/PageBackground";
+
 /*
  * The hero visual is laid out on an 860 x 680 grid (the SVG viewBox),
  * and every piece is positioned in percentages of it, so the whole
@@ -24,20 +27,12 @@ function Home() {
     const navigate = useNavigate();
 
     return (
-        <main className="relative min-h-screen overflow-hidden bg-[#06050c] text-white">
-            <Background />
+        <main className="relative min-h-dvh overflow-hidden bg-[#06050c] text-white">
+            <PageBackground />
 
             {/* ================= NAVBAR ================= */}
             <nav className="relative z-20 mx-auto flex max-w-[1400px] items-center justify-between px-5 py-6 sm:px-6 lg:px-12 lg:py-8">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.12)] lg:h-14 lg:w-14">
-                        <Headphones size={24} strokeWidth={2.4} />
-                    </div>
-
-                    <span className="text-2xl font-semibold tracking-tight lg:text-3xl">
-                        Nexa
-                    </span>
-                </div>
+                <Brand size="lg" onClick={() => navigate("/")} />
 
                 <button className="rounded-full border border-white/20 bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-white/90 backdrop-blur-md transition hover:border-white/40 hover:bg-white/10 lg:px-8 lg:py-3">
                     About
@@ -45,7 +40,7 @@ function Home() {
             </nav>
 
             {/* ================= HERO ================= */}
-            <section className="relative z-10 mx-auto flex max-w-[1400px] items-center px-5 pb-16 pt-6 sm:px-6 lg:min-h-[calc(100vh-120px)] lg:px-12 lg:pb-24">
+            <section className="relative z-10 mx-auto flex max-w-[1400px] items-center px-5 pb-16 pt-6 sm:px-6 lg:min-h-[calc(100dvh-120px)] lg:px-12 lg:pb-24">
                 <div className="grid w-full items-center gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-6">
                     {/* ================= LEFT CONTENT ================= */}
                     <div>
@@ -111,25 +106,6 @@ function Home() {
                 </div>
             </section>
         </main>
-    );
-}
-
-function Background() {
-    return (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-            {/* top-left magenta */}
-            <div className="absolute -left-[12%] top-[5%] h-[480px] w-[380px] rounded-full bg-[radial-gradient(closest-side,rgba(168,40,200,0.5),transparent)]" />
-            {/* top-right blue */}
-            <div className="absolute -right-[8%] -top-[18%] h-[520px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(40,50,200,0.6),transparent)]" />
-            {/* bottom-left violet/blue */}
-            <div className="absolute -bottom-[25%] -left-[10%] h-[520px] w-[760px] rounded-full bg-[radial-gradient(closest-side,rgba(60,70,210,0.5),transparent)]" />
-            {/* bottom-left magenta */}
-            <div className="absolute -bottom-[30%] left-[5%] h-[420px] w-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(170,40,190,0.45),transparent)]" />
-            {/* bottom-center violet wave */}
-            <div className="absolute -bottom-[22%] left-[30%] h-[460px] w-[900px] -rotate-6 rounded-[50%] bg-[radial-gradient(closest-side,rgba(110,50,230,0.5),transparent)]" />
-            {/* bottom-right blue */}
-            <div className="absolute -bottom-[25%] -right-[10%] h-[440px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(50,60,210,0.5),transparent)]" />
-        </div>
     );
 }
 

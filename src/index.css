@@ -25,7 +25,13 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background: #08080c;
+  background: #06050c;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  touch-action: manipulation;
 }
 /* Animated "now playing" bars */
 @keyframes eq-bounce {
@@ -86,6 +92,24 @@ body {
   border: none;
   border-radius: 9999px;
   background: #fff;
+}
+
+/* Bigger slider thumb for fingers */
+@media (pointer: coarse) {
+  .range-slider {
+    height: 28px;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+  }
+
+  .range-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 /* Home hero animations */
