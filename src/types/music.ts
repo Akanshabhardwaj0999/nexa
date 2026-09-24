@@ -1,5 +1,3 @@
-export type MusicSource = "jamendo" | "audius";
-
 export interface Song {
   id: string;
   title: string;

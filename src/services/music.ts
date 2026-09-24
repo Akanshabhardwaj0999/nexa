@@ -1,180 +1,160 @@
 import type { Song } from "../types/music";
-import * as audius from "./audius";
-import * as jamendo from "./jamendo";
+import * as itunes from "./itunes";
 
 /*
- * Jamendo is tried first. If it fails (for example the client id
- * is invalid or suspended) we switch to Audius for the rest of
- * the session instead of showing an empty list.
+ * The same recording is often listed several times (single, album,
+ * "From <film>" soundtrack), so compare titles without bracketed
+ * parts together with the main artist.
  */
-let jamendoAvailable = jamendo.isJamendoConfigured();
+function songKey(song: Song) {
+    const title = song.title
+        .toLowerCase()
+        .replace(/\(.*?\)|\[.*?\]/g, "")
+        .replace(/[^\p{L}\p{N}]+/gu, "");
 
-async function withFallback(
-  fromJamendo: () => Promise<Song[]>,
-  fromAudius: () => Promise<Song[]>,
-) {
-  if (jamendoAvailable) {
-    try {
-      const songs = await fromJamendo();
+    const artist = song.artist
+        .toLowerCase()
+        .split(/,|&/)[0]
+        .replace(/[^\p{L}\p{N}]+/gu, "");
 
-      if (songs.length > 0) {
-        return songs;
-      }
-    } catch (error) {
-      jamendoAvailable = false;
-
-      console.warn(
-        "Jamendo unavailable, using Audius instead.",
-        error,
-      );
-    }
-  }
-
-  return fromAudius();
-}
-
-function searchOne(query: string, page: number) {
-  return withFallback(
-    () => jamendo.searchTracks(query, page),
-    () => audius.searchTracks(query, page),
-  );
-}
-
-/*
- * The same song is often uploaded many times ("2 AM - Karan Aujla
- * (DJJOhAL.Com)" by fun10, fun13, fun15...), so compare titles with
- * bracketed bits, site names and punctuation stripped.
- */
-function titleKey(song: Song) {
-  return song.title
-    .toLowerCase()
-    .replace(/\(.*?\)|\[.*?\]/g, "")
-    .replace(/\b[\w-]+\.(com|in|net|org|pk)\b/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "");
+    return `${title}|${artist}`;
 }
 
 export function dedupeSongs(songs: Song[], existing: Song[] = []) {
-  const seen = new Set(existing.map(titleKey));
-  const seenIds = new Set(existing.map((song) => song.id));
+    const seen = new Set(existing.map(songKey));
+    const seenIds = new Set(existing.map((song) => song.id));
 
-  return songs.filter((song) => {
-    const key = titleKey(song);
+    return songs.filter((song) => {
+        const key = songKey(song);
 
-    if (seenIds.has(song.id) || (key && seen.has(key))) {
-      return false;
-    }
+        if (seenIds.has(song.id) || seen.has(key)) {
+            return false;
+        }
 
-    seen.add(key);
-    seenIds.add(song.id);
-    return true;
-  });
+        seen.add(key);
+        seenIds.add(song.id);
+        return true;
+    });
 }
 
 /*
  * Runs several searches at once and interleaves the results, so a
- * category mixes songs from every query instead of listing one
- * query's results after another. A failing query is skipped.
+ * list mixes songs from every query instead of one after another.
+ * A failing query is skipped.
  */
 async function searchMany(queries: string[], page: number) {
-  const settled = await Promise.allSettled(
-    queries.map((query) => searchOne(query, page)),
-  );
+    const settled = await Promise.allSettled(
+        queries.map((query) => itunes.searchTracks(query, page)),
+    );
 
-  const lists = settled.map((result) =>
-    result.status === "fulfilled" ? result.value : [],
-  );
+    if (settled.every((result) => result.status === "rejected")) {
+        throw new Error("Unable to load songs");
+    }
 
-  if (settled.every((result) => result.status === "rejected")) {
-    throw new Error("Unable to load songs");
-  }
+    const lists = settled.map((result) =>
+        result.status === "fulfilled" ? result.value : [],
+    );
 
-  const mixed: Song[] = [];
-  const longest = Math.max(0, ...lists.map((list) => list.length));
+    const mixed: Song[] = [];
+    const longest = Math.max(0, ...lists.map((list) => list.length));
 
-  for (let i = 0; i < longest; i++) {
-    lists.forEach((list) => {
-      if (list[i]) {
-        mixed.push(list[i]);
-      }
-    });
-  }
+    for (let i = 0; i < longest; i++) {
+        lists.forEach((list) => {
+            if (list[i]) {
+                mixed.push(list[i]);
+            }
+        });
+    }
 
-  return dedupeSongs(mixed);
+    return dedupeSongs(mixed);
 }
 
+/*
+ * Search like a music app: exact matches first, then, if there are
+ * only a few, related songs found with fewer of the words (so a typo
+ * or a song that isn't listed still shows something close).
+ */
 export async function searchSongs(query: string, page = 0) {
-  const trimmed = query.trim();
+    const trimmed = query.trim().replace(/\s+/g, " ");
 
-  if (!trimmed) {
-    return [];
-  }
+    if (!trimmed) {
+        return [];
+    }
 
-  return dedupeSongs(await searchOne(trimmed, page));
+    const exact = dedupeSongs(await itunes.searchTracks(trimmed, page));
+
+    if (page > 0 || exact.length >= 10) {
+        return exact;
+    }
+
+    const words = trimmed.split(" ");
+    const related: string[] = [];
+
+    // "nashe se chadh gyi" -> "nashe se chadh", "nashe se", ...
+    for (let count = words.length - 1; count >= 1 && related.length < 3; count--) {
+        const shorter = words.slice(0, count).join(" ");
+
+        if (shorter.length >= 3) {
+            related.push(shorter);
+        }
+    }
+
+    if (related.length === 0) {
+        return exact;
+    }
+
+    try {
+        return [...exact, ...dedupeSongs(await searchMany(related, 0), exact)];
+    } catch {
+        return exact;
+    }
 }
 
 export interface MusicCategory {
-  id: string;
-  label: string;
-  // Short searches work best: Audius only matches when every word does.
-  queries: string[];
+    id: string;
+    label: string;
+    queries: string[];
 }
 
 export const MUSIC_CATEGORIES: MusicCategory[] = [
-  {
-    id: "bollywood",
-    label: "Bollywood",
-    queries: ["bollywood", "hindi songs", "arijit singh", "shreya ghoshal"],
-  },
-  {
-    id: "romantic",
-    label: "Romantic",
-    queries: ["romantic hindi", "bollywood love", "love mashup", "atif aslam"],
-  },
-  {
-    id: "punjabi",
-    label: "Punjabi",
-    queries: ["punjabi", "karan aujla", "sidhu moose wala", "diljit dosanjh", "ap dhillon"],
-  },
-  {
-    id: "latest",
-    label: "New & latest",
-    queries: ["new punjabi", "latest hindi", "new hindi", "2025 hindi", "2024 bollywood"],
-  },
-  {
-    id: "90s",
-    label: "90s",
-    queries: ["90s bollywood", "90s hindi", "kumar sanu", "udit narayan", "alka yagnik"],
-  },
-  {
-    id: "80s",
-    label: "80s & retro",
-    queries: ["80s bollywood", "old hindi songs", "kishore kumar", "lata mangeshkar", "mohammed rafi"],
-  },
-  {
-    id: "trending",
-    label: "Global trending",
-    queries: [],
-  },
+    {
+        id: "bollywood",
+        label: "Bollywood",
+        queries: ["bollywood", "arijit singh", "shreya ghoshal", "pritam"],
+    },
+    {
+        id: "romantic",
+        label: "Romantic",
+        queries: ["hindi romantic", "love songs hindi", "atif aslam", "jubin nautiyal"],
+    },
+    {
+        id: "punjabi",
+        label: "Punjabi",
+        queries: ["karan aujla", "diljit dosanjh", "sidhu moose wala", "ap dhillon", "shubh"],
+    },
+    {
+        id: "latest",
+        label: "New & latest",
+        queries: ["new punjabi", "new hindi songs", "anuv jain", "aditya rikhari", "b praak"],
+    },
+    {
+        id: "90s",
+        label: "90s",
+        queries: ["90s hindi", "kumar sanu", "udit narayan", "alka yagnik", "sonu nigam"],
+    },
+    {
+        id: "80s",
+        label: "80s & retro",
+        queries: ["kishore kumar", "lata mangeshkar", "mohammed rafi", "r d burman", "asha bhosle"],
+    },
 ];
 
 export async function getCategorySongs(categoryId: string, page = 0) {
-  const category = MUSIC_CATEGORIES.find((item) => item.id === categoryId);
+    const category = MUSIC_CATEGORIES.find((item) => item.id === categoryId);
 
-  if (!category) {
-    return [];
-  }
+    if (!category) {
+        return [];
+    }
 
-  if (category.queries.length === 0) {
-    // Trending lists have no paging, so there is only one page.
-    return page === 0 ? getFeaturedSongs() : [];
-  }
-
-  return searchMany(category.queries, page);
-}
-
-export function getFeaturedSongs() {
-  return withFallback(
-    jamendo.getPopularTracks,
-    audius.getTrendingTracks,
-  );
+    return searchMany(category.queries, page);
 }

@@ -10,7 +10,7 @@ import {
     Volume2,
     VolumeX,
 } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { formatTime } from "../../lib/format";
 import { FALLBACK_COVER } from "../../services/room";
@@ -18,6 +18,10 @@ import type { Song } from "../../types/music";
 
 interface NowPlayingProps {
     song: Song | null;
+    // Element the YouTube player is placed in (from useYouTubePlayer).
+    playerMountRef: (element: HTMLDivElement | null) => void;
+    showVideo: boolean;
+    isResolving: boolean;
     isPlaying: boolean;
     isBuffering: boolean;
     isBlocked: boolean;
@@ -36,6 +40,9 @@ interface NowPlayingProps {
 
 function NowPlaying({
     song,
+    playerMountRef,
+    showVideo,
+    isResolving,
     isPlaying,
     isBuffering,
     isBlocked,
@@ -62,12 +69,36 @@ function NowPlaying({
     const shownTime = scrubTime ?? currentTime;
     const progress = totalTime > 0 ? (shownTime / totalTime) * 100 : 0;
 
-    const commitScrub = () => {
-        if (scrubTime !== null) {
-            onSeek(scrubTime);
-            setScrubTime(null);
+    /*
+     * Seek once the user lets go. The native "change" event fires on
+     * release for mouse, touch and keyboard alike; pointerup is not
+     * reliable on phones (it is often cancelled or never sent for
+     * range inputs), which left the slider stuck without seeking.
+     * React's onChange is the "input" event, so listen natively.
+     */
+    const seekInputRef = useRef<HTMLInputElement | null>(null);
+    const onSeekRef = useRef(onSeek);
+
+    useEffect(() => {
+        onSeekRef.current = onSeek;
+    }, [onSeek]);
+
+    useEffect(() => {
+        const input = seekInputRef.current;
+
+        if (!input) {
+            return;
         }
-    };
+
+        const commit = () => {
+            onSeekRef.current(Number(input.value));
+            setScrubTime(null);
+        };
+
+        input.addEventListener("change", commit);
+
+        return () => input.removeEventListener("change", commit);
+    }, []);
 
     const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
@@ -86,8 +117,10 @@ function NowPlaying({
                                 }
                             }}
                             alt={song.title}
-                            className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
-                                isPlaying ? "" : "saturate-[0.85]"
+                            className={`h-full w-full object-cover transition duration-700 ${
+                                showVideo
+                                    ? "scale-110 opacity-60 blur-2xl"
+                                    : `group-hover:scale-105 ${isPlaying ? "" : "saturate-[0.85]"}`
                             }`}
                         />
                     ) : (
@@ -96,9 +129,25 @@ function NowPlaying({
                         </div>
                     )}
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/10" />
+                    {/*
+                      * YouTube's player, shown at the top of the card. It stays
+                      * mounted (hidden when unused) so playback never restarts.
+                      */}
+                    <div
+                        className={`absolute inset-x-0 top-0 aspect-video overflow-hidden bg-black transition-opacity duration-500 [&_iframe]:h-full [&_iframe]:w-full ${
+                            showVideo ? "opacity-100" : "pointer-events-none opacity-0"
+                        }`}
+                    >
+                        <div ref={playerMountRef} className="h-full w-full" />
+                    </div>
 
-                    <div className="absolute bottom-5 left-5 right-5 sm:bottom-7 sm:left-7 sm:right-7">
+                    <div
+                        className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent ${
+                            showVideo ? "top-1/2" : "top-0"
+                        }`}
+                    />
+
+                    <div className="pointer-events-none absolute bottom-5 left-5 right-5 sm:bottom-7 sm:left-7 sm:right-7">
                         <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-white/50">
                             {isPlaying && (
                                 <span className="flex h-3 items-end gap-0.5">
@@ -107,7 +156,14 @@ function NowPlaying({
                                     <span className="eq-bar h-1.5 w-0.5 bg-white/70 [animation-delay:300ms]" />
                                 </span>
                             )}
-                            {song ? "Now playing" : "Nothing playing"}
+                            {isResolving && (
+                                <Loader2 size={12} className="animate-spin" />
+                            )}
+                            {isResolving
+                                ? "Finding song..."
+                                : song
+                                  ? "Now playing"
+                                  : "Nothing playing"}
                         </p>
 
                         <h1 className="line-clamp-2 text-xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
@@ -165,15 +221,13 @@ function NowPlaying({
             {/* Progress */}
             <div className="mx-auto mt-4 w-full max-w-[460px] sm:mt-5">
                 <input
+                    ref={seekInputRef}
                     type="range"
                     min={0}
                     max={totalTime || 0}
                     step={0.1}
                     value={Math.min(shownTime, totalTime || 0)}
                     onChange={(e) => setScrubTime(Number(e.target.value))}
-                    onPointerUp={commitScrub}
-                    onKeyUp={commitScrub}
-                    onBlur={commitScrub}
                     disabled={!song}
                     style={{ "--progress": `${progress}%` } as CSSProperties}
                     className="range-slider w-full disabled:cursor-not-allowed disabled:opacity-30"
@@ -203,7 +257,7 @@ function NowPlaying({
                     aria-label={isPlaying ? "Pause" : "Play"}
                     className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.2)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
                 >
-                    {isBuffering && isPlaying ? (
+                    {isResolving || (isBuffering && isPlaying) ? (
                         <Loader2 size={22} className="animate-spin" />
                     ) : isPlaying ? (
                         <Pause size={22} fill="currentColor" />

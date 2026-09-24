@@ -364,6 +364,26 @@ export async function removeSongFromRoom(
     }
 }
 
+/*
+ * Saves the YouTube video found for a queued song, so nobody in the
+ * room has to look it up (and spend API quota) again.
+ */
+export async function updateTrackAudio(
+    roomId: string,
+    trackId: string,
+    audioUrl: string,
+) {
+    const { error } = await supabase
+        .from("playlist_tracks")
+        .update({ audio_url: audioUrl })
+        .eq("room_id", roomId)
+        .eq("track_id", trackId);
+
+    if (error) {
+        throw error;
+    }
+}
+
 // --------------------------------------------------
 // Playback
 // --------------------------------------------------

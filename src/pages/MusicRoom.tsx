@@ -8,8 +8,8 @@ import MiniPlayer from "../components/room/MiniPlayer";
 import NowPlaying from "../components/room/NowPlaying";
 import RoomHeader from "../components/room/RoomHeader";
 import PageBackground from "../components/ui/PageBackground";
-import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useRoomChannel } from "../hooks/useRoomChannel";
+import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
 import {
     addSongToRoom,
     getClientId,
@@ -21,7 +21,9 @@ import {
     removeSongFromRoom,
     saveUserName,
     updatePlayback,
+    updateTrackAudio,
 } from "../services/room";
+import { getVideoId, resolveSong, YouTubeError } from "../services/youtube";
 import type { PlaybackMessage, Song } from "../types/music";
 
 // Re-sync when the two listeners drift further apart than this (seconds).
@@ -29,6 +31,12 @@ const DRIFT_TOLERANCE = 0.6;
 
 // How often the room leader shares its position while playing (ms).
 const HEARTBEAT_INTERVAL = 4000;
+
+// Ignore heartbeats this long after our own seek/play/pause (ms).
+const HEARTBEAT_GRACE = 2500;
+
+// Videos to try for one song before giving up (removed, blocked...).
+const MAX_VIDEO_ATTEMPTS = 3;
 
 type RoomStatus = "loading" | "need-name" | "ready" | "not-found" | "error";
 
@@ -63,7 +71,22 @@ function MusicRoom() {
         playlistRef.current = playlist;
     }, [playlist]);
 
-    const player = useAudioPlayer({ onEnded: handleEnded });
+    const [isResolving, setIsResolving] = useState(false);
+
+    // Where to start a saved song that has no video loaded yet.
+    const resumePositionRef = useRef(0);
+
+    // Only the latest play request wins if YouTube lookups overlap.
+    const playRequestRef = useRef(0);
+
+    // Videos that failed to play, per song.
+    const failedVideosRef = useRef<Record<string, string[]>>({});
+
+    const player = useYouTubePlayer({
+        onEnded: handleEnded,
+        onExternalChange: handleExternalChange,
+        onVideoError: handleVideoError,
+    });
 
     const channel = useRoomChannel({
         roomId: status === "ready" ? roomId : null,
@@ -126,7 +149,11 @@ function MusicRoom() {
                 if (savedSong) {
                     currentSongRef.current = savedSong;
                     setCurrentSong(savedSong);
-                    apply(savedSong.audioUrl, playback?.position ?? 0, false);
+                    resumePositionRef.current = playback?.position ?? 0;
+
+                    if (getVideoId(savedSong)) {
+                        apply(savedSong.audioUrl, playback?.position ?? 0, false);
+                    }
                 }
 
                 setRoomId(room.id);
@@ -151,6 +178,13 @@ function MusicRoom() {
     // Sending playback
     // --------------------------------------------------
 
+    /*
+     * When we seek or pause, a heartbeat the leader sent just before
+     * receiving our action can still arrive and would drag us back to
+     * the old position, so ignore heartbeats for a moment after.
+     */
+    const lastLocalActionAt = useRef(0);
+
     function selectSong(song: Song | null) {
         currentSongRef.current = song;
         setCurrentSong(song);
@@ -174,6 +208,10 @@ function MusicRoom() {
             to,
         });
 
+        if (kind === "action") {
+            lastLocalActionAt.current = Date.now();
+        }
+
         // Persist real actions so someone joining later can resume.
         if (kind === "action" && roomId) {
             updatePlayback(roomId, {
@@ -191,21 +229,109 @@ function MusicRoom() {
     // Local actions (always broadcast to the other listener)
     // --------------------------------------------------
 
-    function playSong(song: Song) {
+    /*
+     * Songs come from the catalog without a video; the first time one
+     * is played we find it on YouTube and save the result.
+     */
+    async function playSong(song: Song, position = 0) {
+        const request = ++playRequestRef.current;
+
         selectSong(song);
-        player.apply(song.audioUrl, 0, true);
-        broadcast(song, true, 0);
         setActivity("");
 
-        if (!playlistRef.current.some((item) => item.id === song.id)) {
-            addToPlaylist(song);
+        let playable = song;
+
+        if (!getVideoId(song)) {
+            setIsResolving(true);
+
+            try {
+                playable = await resolveSong(song, failedVideosRef.current[song.id]);
+            } catch (error) {
+                if (request === playRequestRef.current) {
+                    setIsResolving(false);
+                    setActivity(
+                        error instanceof YouTubeError
+                            ? error.message
+                            : "Couldn't play this song. Try another one.",
+                    );
+                }
+
+                return;
+            }
+
+            if (request !== playRequestRef.current) {
+                return;
+            }
+
+            setIsResolving(false);
         }
+
+        selectSong(playable);
+        player.apply(playable.audioUrl, position, true);
+        broadcast(playable, true, position);
+        rememberVideo(playable);
+    }
+
+    // Keep the video with the queued song (locally and for the room).
+    function rememberVideo(song: Song) {
+        const queued = playlistRef.current.find((item) => item.id === song.id);
+
+        if (!queued) {
+            addToPlaylist(song);
+            return;
+        }
+
+        if (queued.audioUrl === song.audioUrl || !roomId) {
+            return;
+        }
+
+        setPlaylist((list) =>
+            list.map((item) => (item.id === song.id ? song : item)),
+        );
+
+        updateTrackAudio(roomId, song.id, song.audioUrl).catch((error) =>
+            console.error("Unable to save video:", error),
+        );
+    }
+
+    // Play / pause done by tapping the video itself.
+    function handleExternalChange(isPlaying: boolean, position: number) {
+        const song = currentSongRef.current;
+
+        if (song) {
+            broadcast(song, isPlaying, position);
+        }
+    }
+
+    // The video can't be played here; try the next best match.
+    function handleVideoError(videoId: string) {
+        const song = currentSongRef.current;
+
+        if (!song) {
+            return;
+        }
+
+        const failed = [...(failedVideosRef.current[song.id] ?? []), videoId];
+        failedVideosRef.current[song.id] = failed;
+
+        if (failed.length >= MAX_VIDEO_ATTEMPTS) {
+            setActivity(`"${song.title}" can't be played right now. Try another song.`);
+            return;
+        }
+
+        playSong({ ...song, audioUrl: "" }, player.getCurrentTime());
     }
 
     function togglePlay() {
         const song = currentSongRef.current;
 
         if (!song) {
+            return;
+        }
+
+        if (!getVideoId(song) || player.videoId !== getVideoId(song)) {
+            playSong(song, resumePositionRef.current);
+            resumePositionRef.current = 0;
             return;
         }
 
@@ -285,6 +411,22 @@ function MusicRoom() {
         const song = message.song;
 
         if (!song) {
+            return;
+        }
+
+        if (!getVideoId(song)) {
+            resolveSong(song)
+                .then((playable) =>
+                    handleRemotePlayback({ ...message, song: playable }),
+                )
+                .catch((error) => console.error(error));
+            return;
+        }
+
+        if (
+            message.kind === "heartbeat" &&
+            Date.now() - lastLocalActionAt.current < HEARTBEAT_GRACE
+        ) {
             return;
         }
 
@@ -625,6 +767,9 @@ function MusicRoom() {
 
                     <NowPlaying
                         song={currentSong}
+                        playerMountRef={player.mountRef}
+                        showVideo={Boolean(player.videoId) && player.videoId === getVideoId(currentSong)}
+                        isResolving={isResolving}
                         isPlaying={player.isPlaying}
                         isBuffering={player.isBuffering}
                         isBlocked={player.isBlocked}
