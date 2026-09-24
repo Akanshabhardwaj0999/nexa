@@ -41,6 +41,9 @@ function LibraryPanel({
     // Ignore responses for a list the user has already moved away from.
     const requestId = useRef(0);
 
+    const inputRef = useRef<HTMLInputElement>(null);
+    const resultsRef = useRef<HTMLDivElement>(null);
+
     // Loads the first page of a search (when a query is set) or a category.
     const loadList = useCallback(async (searchQuery: string, categoryId: string) => {
         const id = ++requestId.current;
@@ -125,6 +128,11 @@ function LibraryPanel({
 
         setTab("discover");
 
+        // On phones the keyboard covers the results; close it and bring
+        // the list into view.
+        inputRef.current?.blur();
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
         if (trimmed === activeQuery) {
             loadList(trimmed, category);
         } else {
@@ -181,12 +189,22 @@ function LibraryPanel({
                     <Search size={17} className="shrink-0 text-white/30" />
                 )}
 
+                {/*
+                  * Phone keyboards "correct" Hindi / Punjabi words typed in
+                  * English letters ("chadh gyi" -> "chad guy"), so turn that off.
+                  */}
                 <input
+                    ref={inputRef}
+                    type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search songs or singers..."
                     enterKeyHint="search"
-                    className="w-full min-w-0 bg-transparent text-base text-white outline-none placeholder:text-white/30 sm:text-sm"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="w-full min-w-0 bg-transparent text-base text-white outline-none placeholder:text-white/30 sm:text-sm [&::-webkit-search-cancel-button]:appearance-none"
                 />
 
                 {query && (
@@ -239,7 +257,10 @@ function LibraryPanel({
                 ))}
             </div>
 
-            <div className="-mx-1 mt-3 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
+            <div
+                ref={resultsRef}
+                className="-mx-1 mt-3 min-h-0 flex-1 scroll-mt-4 overflow-y-auto px-1 pb-1"
+            >
                 {tab === "queue" ? (
                     playlist.length === 0 ? (
                         <div className="mt-2 rounded-2xl border border-dashed border-white/10 px-5 py-8 text-center">
