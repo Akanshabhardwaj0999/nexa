@@ -7,6 +7,13 @@ import type { Song } from "../types/music";
  */
 const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 
+/*
+ * Searches go through our own server (api/itunes.ts, or the dev server
+ * proxy). Apple redirects browsers that say they're an iPhone to the
+ * Music app instead of answering, so asking Apple directly fails there.
+ */
+const PROXY_SEARCH_URL = "/api/itunes";
+
 // The Indian store has the widest Hindi / Punjabi catalog.
 const COUNTRY = "IN";
 
@@ -116,7 +123,26 @@ function fetchJsonp(url: string): Promise<ITunesResponse> {
     });
 }
 
-async function request(url: string): Promise<ITunesResponse> {
+async function requestViaProxy(query: string): Promise<ITunesResponse> {
+    const response = await fetch(`${PROXY_SEARCH_URL}?${query}`);
+
+    if (!response.ok) {
+        throw new Error(`iTunes search failed (${response.status})`);
+    }
+
+    return response.json();
+}
+
+async function request(query: string): Promise<ITunesResponse> {
+    try {
+        return await requestViaProxy(query);
+    } catch (error) {
+        // Without our server (for example `vite preview`), ask Apple
+        // directly; that works everywhere except on iPhones.
+        console.warn("Search proxy failed, asking iTunes directly", error);
+    }
+
+    const url = `${ITUNES_SEARCH_URL}?${query}`;
     let response: Response;
 
     try {
@@ -149,23 +175,23 @@ export function searchTracks(term: string, page = 0): Promise<Song[]> {
         offset: String(page * PAGE_SIZE),
     });
 
-    const url = `${ITUNES_SEARCH_URL}?${params.toString()}`;
-    const cached = cache.get(url);
+    const query = params.toString();
+    const cached = cache.get(query);
 
     if (cached && Date.now() - cached.at < CACHE_TTL) {
         return cached.songs;
     }
 
-    const songs = limited(() => request(url)).then((data) =>
+    const songs = limited(() => request(query)).then((data) =>
         data.results
             .filter((track) => track.kind === "song" && track.trackName)
             .map(mapTrackToSong),
     );
 
-    cache.set(url, { at: Date.now(), songs });
+    cache.set(query, { at: Date.now(), songs });
 
     // Don't keep failures; the next attempt should try again.
-    songs.catch(() => cache.delete(url));
+    songs.catch(() => cache.delete(query));
 
     return songs;
 }
