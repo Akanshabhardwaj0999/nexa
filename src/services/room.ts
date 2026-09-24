@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import type { Song } from "../types/music";
+import type { ChatMessage, Song } from "../types/music";
 
 const USER_NAME_KEY = "nexa-user-name";
 const CLIENT_ID_KEY = "nexa-client-id";
@@ -12,6 +12,13 @@ export function saveUserName(name: string) {
     localStorage.setItem(USER_NAME_KEY, name);
 }
 
+export function randomId() {
+    // randomUUID is missing on older mobile browsers and non-HTTPS pages
+    return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 /*
  * A random id per browser tab, used to tell our own realtime
  * messages apart from the other listener's (names can match).
@@ -20,11 +27,7 @@ export function getClientId() {
     let clientId = sessionStorage.getItem(CLIENT_ID_KEY);
 
     if (!clientId) {
-        // randomUUID is missing on older mobile browsers and non-HTTPS pages
-        clientId =
-            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                ? crypto.randomUUID()
-                : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+        clientId = randomId();
         sessionStorage.setItem(CLIENT_ID_KEY, clientId);
     }
 
@@ -428,6 +431,60 @@ export async function updatePlayback(
                 onConflict: "room_id",
             },
         );
+
+    if (error) {
+        throw error;
+    }
+}
+
+// --------------------------------------------------
+// Chat
+// --------------------------------------------------
+
+interface MessageRow {
+    id: string;
+    client_id: string;
+    user_name: string;
+    body: string;
+    created_at: string;
+}
+
+// Messages shown when opening a room; older ones stay in the database.
+const MESSAGE_HISTORY_LIMIT = 100;
+
+export async function getMessages(roomId: string): Promise<ChatMessage[]> {
+    const { data, error } = await supabase
+        .from("room_messages")
+        .select("id, client_id, user_name, body, created_at")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: false })
+        .limit(MESSAGE_HISTORY_LIMIT);
+
+    if (error) {
+        throw error;
+    }
+
+    return (data as MessageRow[])
+        .map((row) => ({
+            id: row.id,
+            clientId: row.client_id,
+            userName: row.user_name,
+            text: row.body,
+            sentAt: new Date(row.created_at).getTime(),
+        }))
+        .reverse();
+}
+
+export async function saveMessage(roomId: string, message: ChatMessage) {
+    const { error } = await supabase
+        .from("room_messages")
+        .insert({
+            id: message.id,
+            room_id: roomId,
+            client_id: message.clientId,
+            user_name: message.userName,
+            body: message.text,
+        });
 
     if (error) {
         throw error;

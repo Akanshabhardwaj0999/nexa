@@ -8,6 +8,7 @@ import {
 
 import { supabase } from "../lib/supabase";
 import type {
+    ChatMessage,
     PlaybackMessage,
     RoomMember,
 } from "../types/music";
@@ -16,6 +17,7 @@ interface RoomChannelHandlers {
     onPlayback: (message: PlaybackMessage) => void;
     onPlaylistChanged: () => void;
     onSyncRequest: (fromClientId: string) => void;
+    onChat: (message: ChatMessage) => void;
 }
 
 interface UseRoomChannelProps extends RoomChannelHandlers {
@@ -130,6 +132,9 @@ export function useRoomChannel({
                         (payload as { clientId: string }).clientId,
                     ),
                 )
+                .on("broadcast", { event: "chat" }, ({ payload }) =>
+                    newEntry.handlers.current.onChat(payload as ChatMessage),
+                )
                 .on("presence", { event: "sync" }, () =>
                     newEntry.setMembers.current(readMembers(channel)),
                 )
@@ -210,11 +215,17 @@ export function useRoomChannel({
         [send, clientId],
     );
 
+    const sendChat = useCallback(
+        (message: ChatMessage) => send("chat", message),
+        [send],
+    );
+
     return {
         members,
         isConnected,
         sendPlayback,
         sendPlaylistChanged,
         requestSync,
+        sendChat,
     };
 }

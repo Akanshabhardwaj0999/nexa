@@ -27,3 +27,11 @@ export interface RoomMember {
   userName: string;
   joinedAt: number;
 }
+
+export interface ChatMessage {
+  id: string;
+  clientId: string;
+  userName: string;
+  text: string;
+  sentAt: number;
+}

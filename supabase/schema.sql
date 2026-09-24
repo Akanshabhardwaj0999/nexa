@@ -42,20 +42,35 @@ create table if not exists public.room_playback (
     updated_by text
 );
 
+create table if not exists public.room_messages (
+    -- Made by the sender, so the live copy of a message and the
+    -- saved copy can be matched.
+    id text primary key,
+    room_id uuid not null references public.rooms (id) on delete cascade,
+    client_id text not null,
+    user_name text not null,
+    body text not null check (char_length(body) between 1 and 1000),
+    created_at timestamptz not null default now()
+);
+
 create index if not exists playlist_tracks_room_position_idx
     on public.playlist_tracks (room_id, position);
+
+create index if not exists room_messages_room_created_idx
+    on public.room_messages (room_id, created_at);
 
 -- Nexa has no login: anyone with a room code can use the room.
 alter table public.rooms enable row level security;
 alter table public.room_members enable row level security;
 alter table public.playlist_tracks enable row level security;
 alter table public.room_playback enable row level security;
+alter table public.room_messages enable row level security;
 
 do $$
 declare
     t text;
 begin
-    foreach t in array array['rooms', 'room_members', 'playlist_tracks', 'room_playback']
+    foreach t in array array['rooms', 'room_members', 'playlist_tracks', 'room_playback', 'room_messages']
     loop
         if not exists (
             select 1 from pg_policies

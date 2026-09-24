@@ -1,7 +1,8 @@
 import { ChevronLeft } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import ChatPanel from "../components/room/ChatPanel";
 import LibraryPanel from "../components/room/LibraryPanel";
 import NamePrompt from "../components/room/NamePrompt";
 import MiniPlayer from "../components/room/MiniPlayer";
@@ -13,18 +14,21 @@ import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
 import {
     addSongToRoom,
     getClientId,
+    getMessages,
     getPlayback,
     getPlaylist,
     getRoomByCode,
     getStoredUserName,
     joinRoom,
+    randomId,
     removeSongFromRoom,
+    saveMessage,
     saveUserName,
     updatePlayback,
     updateTrackAudio,
 } from "../services/room";
 import { getVideoId, resolveSong, YouTubeError } from "../services/youtube";
-import type { PlaybackMessage, Song } from "../types/music";
+import type { ChatMessage, PlaybackMessage, Song } from "../types/music";
 
 // Re-sync when the two listeners drift further apart than this (seconds).
 const DRIFT_TOLERANCE = 0.6;
@@ -62,6 +66,9 @@ function MusicRoom() {
     const [playlist, setPlaylist] = useState<Song[]>([]);
     const [currentSong, setCurrentSong] = useState<Song | null>(null);
     const [activity, setActivity] = useState("");
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     // Latest values for realtime handlers and audio callbacks.
     const currentSongRef = useRef<Song | null>(null);
@@ -95,6 +102,7 @@ function MusicRoom() {
         onPlayback: handleRemotePlayback,
         onPlaylistChanged: refreshPlaylist,
         onSyncRequest: handleSyncRequest,
+        onChat: handleChat,
     });
 
     // --------------------------------------------------
@@ -129,9 +137,15 @@ function MusicRoom() {
                 // Makes sure people opening a shared link are members too.
                 await joinRoom(code, userName);
 
-                const [songs, playback] = await Promise.all([
+                const [songs, playback, history] = await Promise.all([
                     getPlaylist(room.id),
                     getPlayback(room.id),
+                    // Chat still works live without saved messages (for
+                    // example before room_messages is created).
+                    getMessages(room.id).catch((error) => {
+                        console.warn("Unable to load chat history:", error);
+                        return [];
+                    }),
                 ]);
 
                 if (cancelled) {
@@ -139,6 +153,7 @@ function MusicRoom() {
                 }
 
                 setPlaylist(songs);
+                setMessages(history);
 
                 // Resume where the room left off, paused. If a friend is
                 // online they'll send the live position once we connect.
@@ -573,6 +588,50 @@ function MusicRoom() {
     }
 
     // --------------------------------------------------
+    // Chat
+    // --------------------------------------------------
+
+    function handleChat(message: ChatMessage) {
+        if (message.clientId === clientId) {
+            return;
+        }
+
+        setMessages((list) =>
+            list.some((item) => item.id === message.id) ? list : [...list, message],
+        );
+
+        if (!isChatOpen) {
+            setUnreadCount((count) => count + 1);
+        }
+    }
+
+    function sendChat(text: string) {
+        const message: ChatMessage = {
+            id: randomId(),
+            clientId,
+            userName,
+            text,
+            sentAt: Date.now(),
+        };
+
+        setMessages((list) => [...list, message]);
+        channel.sendChat(message);
+
+        if (roomId) {
+            saveMessage(roomId, message).catch((error) =>
+                console.warn("Unable to save chat message:", error),
+            );
+        }
+    }
+
+    const openChat = () => {
+        setIsChatOpen(true);
+        setUnreadCount(0);
+    };
+
+    const closeChat = useCallback(() => setIsChatOpen(false), []);
+
+    // --------------------------------------------------
     // Lock screen / media keys
     // --------------------------------------------------
 
@@ -751,7 +810,19 @@ function MusicRoom() {
                 clientId={clientId}
                 members={channel.members}
                 isConnected={channel.isConnected}
+                unreadCount={unreadCount}
+                onOpenChat={openChat}
                 onHome={() => navigate("/")}
+            />
+
+            <ChatPanel
+                open={isChatOpen}
+                clientId={clientId}
+                members={channel.members}
+                messages={messages}
+                isConnected={channel.isConnected}
+                onSend={sendChat}
+                onClose={closeChat}
             />
 
             {/* Bottom padding leaves room for the mini player on phones. */}
