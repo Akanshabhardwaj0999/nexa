@@ -2,6 +2,7 @@ import { ArrowRight, Link2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import RoomFullDialog from "../components/room/RoomFullDialog";
 import FormPage from "../components/ui/FormPage";
 import {
     footerLinkClass,
@@ -11,6 +12,7 @@ import {
 } from "../components/ui/formStyles";
 import {
     joinRoom,
+    RoomFullError,
     saveUserName,
 } from "../services/room";
 
@@ -27,6 +29,7 @@ function JoinRoom() {
     );
     const [isJoining, setIsJoining] = useState(false);
     const [error, setError] = useState("");
+    const [fullRoomCode, setFullRoomCode] = useState("");
 
     const handleJoinRoom = async () => {
         const trimmedName = name.trim();
@@ -57,7 +60,9 @@ function JoinRoom() {
         } catch (error) {
             console.error(error);
 
-            if (
+            if (error instanceof RoomFullError) {
+                setFullRoomCode(normalizedCode);
+            } else if (
                 error instanceof Error &&
                 error.message === "Room not found"
             ) {
@@ -161,6 +166,17 @@ function JoinRoom() {
                     {!isJoining && <ArrowRight size={17} />}
                 </button>
             </form>
+
+            {fullRoomCode && (
+                <RoomFullDialog
+                    roomCode={fullRoomCode}
+                    onClose={() => {
+                        setFullRoomCode("");
+                        setRoomCode("");
+                    }}
+                    onCreateRoom={() => navigate("/create")}
+                />
+            )}
         </FormPage>
     );
 }

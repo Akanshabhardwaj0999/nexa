@@ -7,6 +7,7 @@ import LibraryPanel from "../components/room/LibraryPanel";
 import NamePrompt from "../components/room/NamePrompt";
 import MiniPlayer from "../components/room/MiniPlayer";
 import NowPlaying from "../components/room/NowPlaying";
+import RoomFullDialog from "../components/room/RoomFullDialog";
 import RoomHeader from "../components/room/RoomHeader";
 import PageBackground from "../components/ui/PageBackground";
 import { useRoomChannel } from "../hooks/useRoomChannel";
@@ -22,6 +23,7 @@ import {
     joinRoom,
     randomId,
     removeSongFromRoom,
+    RoomFullError,
     saveMessage,
     saveUserName,
     updatePlayback,
@@ -42,7 +44,7 @@ const HEARTBEAT_GRACE = 2500;
 // Videos to try for one song before giving up (removed, blocked...).
 const MAX_VIDEO_ATTEMPTS = 3;
 
-type RoomStatus = "loading" | "need-name" | "ready" | "not-found" | "error";
+type RoomStatus = "loading" | "need-name" | "ready" | "not-found" | "full" | "error";
 
 /*
  * Time a realtime message spent in transit. Device clocks can
@@ -174,11 +176,17 @@ function MusicRoom() {
                 setRoomId(room.id);
                 setStatus("ready");
             } catch (error) {
-                console.error("Unable to load room:", error);
-
-                if (!cancelled) {
-                    setStatus("error");
+                if (cancelled) {
+                    return;
                 }
+
+                if (error instanceof RoomFullError) {
+                    setStatus("full");
+                    return;
+                }
+
+                console.error("Unable to load room:", error);
+                setStatus("error");
             }
         }
 
@@ -728,6 +736,20 @@ function MusicRoom() {
                     setUserName(name);
                 }}
             />
+        );
+    }
+
+    if (status === "full") {
+        return (
+            <main className="relative min-h-dvh bg-[#06050c]">
+                <PageBackground />
+
+                <RoomFullDialog
+                    roomCode={code}
+                    onClose={() => navigate("/join")}
+                    onCreateRoom={() => navigate("/create")}
+                />
+            </main>
         );
     }
 
