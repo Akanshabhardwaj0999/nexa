@@ -281,6 +281,38 @@ export function useYouTubePlayer({
         };
     }, [host]);
 
+    /*
+     * Phones (and some battery savers) pause embedded videos while the
+     * page is hidden. When the listener comes back, carry on playing
+     * instead of leaving the song paused.
+     */
+    useEffect(() => {
+        const handleVisibility = () => {
+            const player = playerRef.current;
+
+            if (
+                document.visibilityState !== "visible" ||
+                !player ||
+                !readyRef.current ||
+                !videoIdRef.current ||
+                !wantPlayingRef.current
+            ) {
+                return;
+            }
+
+            const state = player.getPlayerState();
+
+            if (state !== STATE.PLAYING && state !== STATE.BUFFERING && state !== STATE.ENDED) {
+                player.playVideo();
+                armBlockCheck();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibility);
+
+        return () => document.removeEventListener("visibilitychange", handleVisibility);
+    }, [armBlockCheck]);
+
     // Keep the time and length shown up to date.
     useEffect(() => {
         const interval = window.setInterval(() => {
