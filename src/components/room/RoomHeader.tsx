@@ -1,4 +1,4 @@
-import { Check, Copy, Link2 } from "lucide-react";
+import { Check, Copy, Link2, MessageCircle } from "lucide-react";
 import { useState } from "react";
 
 import { getInviteLink } from "../../services/room";
@@ -12,6 +12,8 @@ interface RoomHeaderProps {
     clientId: string;
     members: RoomMember[];
     isConnected: boolean;
+    unreadCount: number;
+    onOpenChat: () => void;
     onHome: () => void;
 }
 
@@ -20,6 +22,8 @@ function RoomHeader({
     clientId,
     members,
     isConnected,
+    unreadCount,
+    onOpenChat,
     onHome,
 }: RoomHeaderProps) {
     const [copied, setCopied] = useState<"code" | "link" | null>(null);
@@ -68,9 +72,13 @@ function RoomHeader({
                     )}
                 </button>
 
-                <div
-                    className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/5 pl-1.5 pr-3"
-                    title={members.map((member) => member.userName).join(", ")}
+                <button
+                    onClick={onOpenChat}
+                    className="relative flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/5 pl-1.5 pr-3 transition hover:bg-white/10"
+                    title={`Chat with ${members.map((member) => member.userName).join(", ")}`}
+                    aria-label={
+                        unreadCount > 0 ? `Open chat, ${unreadCount} unread` : "Open chat"
+                    }
                 >
                     <div className="flex -space-x-2">
                         {members.slice(0, 3).map((member, index) => (
@@ -104,7 +112,15 @@ function RoomHeader({
                             isConnected ? "bg-emerald-400" : "bg-amber-300 animate-pulse"
                         }`}
                     />
-                </div>
+
+                    <MessageCircle size={15} className="shrink-0 text-white/60" />
+
+                    {unreadCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-semibold text-white">
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                    )}
+                </button>
 
                 <button
                     onClick={() => copy("link")}
